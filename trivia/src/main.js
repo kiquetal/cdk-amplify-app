@@ -18,19 +18,7 @@ Amplify.configure(amplify_outputs);
 let pubsub = null;
 let currentUsername = '';
 let activeSubscription = null;
-
-// New: Cleanup function to prevent memory leaks
-function cleanup() {
-  try {
-    console.log("Running cleanup");
-    if(activeSubscription) {
-      activeSubscription.unsubscribe();
-      activeSubscription = null;
-    }
-  } catch(error) {
-    console.error("Error in cleanup:", error);
-  }
-}
+let connectionMonitorActive = false;
 
 // Replace the existing Hub.listen with our connection manager
 function waitForConnection(timeoutMs = 10000) {
@@ -41,7 +29,7 @@ function waitForConnection(timeoutMs = 10000) {
     }, timeoutMs);
 
     // Listen for connection state changes
-    const hubListener = Hub.listen('pubsub', (data) => {
+Hub.listen('pubsub', (data) => {
       const { payload } = data;
       if (payload.event === CONNECTION_STATE_CHANGE) {
         const connectionState = payload.data.connectionState;
@@ -68,25 +56,21 @@ async function initializePubSub() {
     const { credentials, identityId } = await fetchAuthSession();
 
     logger.log("Credentials:", identityId); // 🛠️
-    if(!credentials) throw new Error('No credentials found');
+    if (credentials) {
+      pubsub = new PubSub({
+        region: 'us-east-1',
+        endpoint: 'wss://a2yqm0wer1ijho-ats.iot.us-east-1.amazonaws.com/mqtt',
+        provider: 'AWSIoTProvider',
+      });
+      await subscribeToIoTTopic();
+      console.log("subscription active");
+      await waitForConnection(10000);
+    } else {
+      throw new Error('No credentials found');
+    }
 
-    // 2. Initialize PubSub
-    pubsub = new PubSub({
-      region: 'us-east-1',
-      endpoint: 'wss://a2yqm0wer1ijho-ats.iot.us-east-1.amazonaws.com/mqtt',
-      provider: 'AWSIoTProvider',
-    });
-
-
-
-    // 3. Subscribe first to avoid missing messages
-     await subscribeToIoTTopic();
-    console.log("subscription active");
-
-    await waitForConnection(10000); // Wait for connection
-
-    // 4. Publish presence
-    //await publishUserToIoT("kiquetal");
+    // Add connection monitoring after PubSub is initialized
+    setupConnectionMonitoring();
 
   } catch(error) {
     console.error('PubSub Init Error:', error);
@@ -149,18 +133,39 @@ function subscribeToIoTTopic() {
     activeSubscription = pubsub.subscribe({
       topics: ["trivia"]
     })
-      activeSubscription.subscribe({
-        next:(data)=> {
+    activeSubscription.subscribe({
+      next:(data)=> {
+        logger.log('Received message:', data);
 
-          logger.log( 'Received message:', data); // 🛠️
-        },
-        error: (error) => {
-          logger.error('Subscription error:', error); // 🛠️
-        },
-        complete: () => {
-          logger.log('Subscription completed'); // 🛠️
+        // Process different message types
+        if (data.value) {
+          // Check message type
+          if (data.value.type === 'logout') {
+            // Handle logout message
+            const username = data.value.username;
+            logger.log(`User ${username} has logged out`);
+            removeUserFromUI(username);
+          } else if (data.value.msg) {
+            // Handle regular messages
+            const message = data.value.msg;
+            logger.log('Received regular message:', message);
+
+            if (message.startsWith('Ha ingresado ')) {
+              const username = message.replace('Ha ingresado ', '');
+              if (username !== currentUsername) {
+                addUserToUI(username);
+              }
+            }
+          }
         }
-      } );
+      },
+      error: (error) => {
+        logger.error('Subscription error:', error); // 🛠️
+      },
+      complete: () => {
+        logger.log('Subscription completed'); // 🛠️
+      }
+    });
 
     resolve();
   });
@@ -182,13 +187,27 @@ function addUserToUI(username) {
     </div>`;
 }
 
+// New function to remove users from the UI when they logout
+function removeUserFromUI(username) {
+  const userElement = document.querySelector(`[data-username="${username}"]`);
+  if (userElement) {
+    userElement.remove();
+    logger.log(`Removed user ${username} from UI`);
+  }
+}
+
 // Updated publish function
 async function publishUserToIoT(username) {
   try {
 
     await pubsub.publish({
-      topics: 'trivia',
-      message: {msg: `Ha ingresado ${username}`},
+      topics: ['trivia'], // Use array format
+      message: {
+        type: 'login',
+        username: username,
+        msg: `Ha ingresado ${username}`,
+        timestamp: new Date().toISOString()
+      },
     });
     logger.log('Published message:', username); // 🛠️
   } catch (error) {
@@ -196,6 +215,66 @@ async function publishUserToIoT(username) {
     throw error;
   }
 }
+
+// New function to publish logout messages
+async function publishUserLogout(username) {
+  try {
+    await pubsub.publish({
+      topics: ['trivia'], // Make sure to use array format
+      message: {
+        type: 'logout',
+        username: username,
+        timestamp: new Date().toISOString()
+      },
+    });
+    logger.log(`Published logout message for ${username}`);
+  } catch (error) {
+    logger.error('Error publishing logout message:', error);
+    throw error;
+  }
+}
+
+// Function to monitor connection state and detect disconnections
+function setupConnectionMonitoring() {
+  if (connectionMonitorActive) return;
+
+  connectionMonitorActive = true;
+  logger.log('Setting up connection state monitoring');
+
+  Hub.listen('pubsub', async (data) => {
+    const { payload } = data;
+    if (payload.event === CONNECTION_STATE_CHANGE) {
+      const connectionState = payload.data.connectionState;
+      logger.log(`Connection state: ${connectionState}`);
+
+      if (connectionState === ConnectionState.ConnectionLost ||
+          connectionState === ConnectionState.Disconnected) {
+        logger.log('Connection closed, sending logout notification');
+        try {
+          if (currentUsername && pubsub) {
+            await publishUserLogout(currentUsername);
+          }
+        } catch (error) {
+          logger.error('Failed to send logout notification:', error);
+        }
+      }
+    }
+  });
+
+  // Handle page unload events
+  window.addEventListener('beforeunload', async (event) => {
+    logger.log('Page is being unloaded, notifying logout');
+    if (currentUsername && pubsub) {
+      try {
+        // Send a synchronous request to ensure it completes before page unloads
+        await publishUserLogout(currentUsername);
+      } catch (error) {
+        logger.error('Error sending logout on page unload:', error);
+      }
+    }
+  });
+}
+
 // Initialize
 document.querySelector('#app').innerHTML = `
   <div>
