@@ -21,9 +21,14 @@ let activeSubscription = null;
 
 // New: Cleanup function to prevent memory leaks
 function cleanup() {
-  if(activeSubscription) {
-    activeSubscription.unsubscribe();
-    activeSubscription = null;
+  try {
+    console.log("Running cleanup");
+    if(activeSubscription) {
+      activeSubscription.unsubscribe();
+      activeSubscription = null;
+    }
+  } catch(error) {
+    console.error("Error in cleanup:", error);
   }
 }
 
@@ -59,8 +64,6 @@ function waitForConnection(timeoutMs = 10000) {
 async function initializePubSub() {
   try {
 
-
-
     // 1. Verify authentication
     const { credentials, identityId } = await fetchAuthSession();
 
@@ -81,7 +84,6 @@ async function initializePubSub() {
     console.log("subscription active");
 
     await waitForConnection(10000); // Wait for connection
-    await publishUserToIoT("kiquetal-in-da-house");
 
     // 4. Publish presence
     //await publishUserToIoT("kiquetal");
@@ -93,45 +95,52 @@ async function initializePubSub() {
 }
 
 async function addUserToWaitingList() {
-  cleanup(); // Clear previous connections
+  try {
+    console.log("Starting addUserToWaitingList");
 
-  const username = prompt("Please enter your username:");
-  if(!username) return;
+    console.log("Showing prompt for username");
+    const username = prompt("Please enter your username:");
+    console.log("Username prompt result:", username);
 
-  currentUsername = username;
+    if (!username) {
+      console.log("No username provided, stopping");
+      return;
+    }
 
-  // UI Setup
-  const waitingListContent = document.querySelector('#waiting-list-content');
-  waitingListContent.innerHTML = '';
+    currentUsername = username;
 
-  // Mock users
-  ['Alice', 'Bob', 'Charlie', 'Diana'].forEach(user => {
-    if(user !== currentUsername) {
-      waitingListContent.innerHTML += `
+    // 1. Publish user to IoT
+    await publishUserToIoT(username);
+    // UI Setup
+    const waitingListContent = document.querySelector('#waiting-list-content');
+    waitingListContent.innerHTML = '';
+
+    // Mock users
+    ['Alice', 'Bob', 'Charlie', 'Diana'].forEach(user => {
+      if (user !== currentUsername) {
+        waitingListContent.innerHTML += `
         <div class="user-entry">
           <p>User: ${user}</p>
           <button class="challenge-btn" onclick="window.challengeUser('${user}')">
             Challenge
           </button>
         </div>`;
-    }
-  });
+      }
+    });
 
-  // Current user
-  waitingListContent.innerHTML += `
+    // Current user
+    waitingListContent.innerHTML += `
     <div class="user-entry current-user">
       <p>User: ${currentUsername} (You)</p>
     </div>`;
 
-  // Initialize PubSub
-  try {
-    await initializePubSub();
-    console.log('PubSub active');
-  } catch(error) {
-    alert('Connection failed. Please refresh.');
-    console.error('Final error:', error);
   }
+    catch (error) {
+        console.error('Error adding user to waiting list:', error);
+    }
+
 }
+
 
 function subscribeToIoTTopic() {
   return new Promise((resolve) => {
@@ -178,15 +187,15 @@ async function publishUserToIoT(username) {
   try {
 
     await pubsub.publish({
-      topics:'trivia',
-        message: {msg: username},
+      topics: 'trivia',
+      message: {msg: `Ha ingresado ${username}`},
     });
-  } catch(error) {
+    logger.log('Published message:', username); // 🛠️
+  } catch (error) {
     console.error('Publish error:', error);
     throw error;
   }
 }
-
 // Initialize
 document.querySelector('#app').innerHTML = `
   <div>
@@ -201,4 +210,16 @@ window.challengeUser = (username) => {
   alert(`Challenging ${username} to a game!`);
 };
 
-addUserToWaitingList();
+try {
+    initializePubSub()
+        .then(() => {
+        console.log("PubSub initialized successfully");
+        addUserToWaitingList();
+        })
+        .catch((error) => {
+        console.error("Error initializing PubSub:", error);
+        });
+}
+catch (error) {
+    console.error("Error in main.js:", error);
+}
