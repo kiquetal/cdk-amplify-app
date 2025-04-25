@@ -275,6 +275,65 @@ function setupConnectionMonitoring() {
   });
 }
 
+// Add function to invoke Lambda
+async function invokeLambda(functionName, payload) {
+  try {
+    // Get credentials from current session - reuse existing auth
+    const { credentials } = await fetchAuthSession();
+
+    if (!credentials) {
+      throw new Error('No credentials available to invoke Lambda');
+    }
+
+    // Create Lambda client using the credentials
+    const lambdaClient = new LambdaClient({
+      region: 'us-east-1', // Use same region as your other AWS services
+      credentials: credentials
+    });
+
+    // Prepare the command with the function name and payload
+    const command = new InvokeCommand({
+      FunctionName: functionName,
+      Payload: JSON.stringify(payload),
+      InvocationType: 'RequestResponse' // For synchronous execution (use 'Event' for async)
+    });
+
+    // Send the command to Lambda
+    logger.log(`Invoking Lambda function: ${functionName}`);
+    const response = await lambdaClient.send(command);
+
+    // Handle the response
+    if (response.StatusCode === 200) {
+      // Convert the Uint8Array response to a string, then to JSON
+      const responseData = new TextDecoder().decode(response.Payload);
+      logger.log('Lambda response:', responseData);
+
+      try {
+        return JSON.parse(responseData);
+      } catch (e) {
+        return responseData;
+      }
+    } else {
+      throw new Error(`Lambda invocation failed with status: ${response.StatusCode}`);
+    }
+  } catch (error) {
+    logger.error('Lambda invocation error:', error);
+    throw error;
+  }
+}
+
+// Example usage - update the challengeUser function
+window.challengeUser = async (username) => {
+  try {
+
+    alert("Challenging " + username + " to a game!");
+
+  } catch (error) {
+    console.error('Error challenging user:', error);
+    alert(`Error challenging ${username}: ${error.message}`);
+  }
+};
+
 // Initialize
 document.querySelector('#app').innerHTML = `
   <div>
