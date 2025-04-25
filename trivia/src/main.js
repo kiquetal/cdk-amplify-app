@@ -27,24 +27,34 @@ function cleanup() {
   }
 }
 
+// Replace the existing Hub.listen with our connection manager
+function waitForConnection(timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    // Set timeout to reject the promise if connection takes too long
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`Connection timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
 
+    // Listen for connection state changes
+    const hubListener = Hub.listen('pubsub', (data) => {
+      const { payload } = data;
+      if (payload.event === CONNECTION_STATE_CHANGE) {
+        const connectionState = payload.data.connectionState;
+        logger.log(`Connection state: ${connectionState}`);
 
-Hub.listen('pubsub', (data) => {
-  const { payload } = data;
-  if (payload.event === CONNECTION_STATE_CHANGE) {
-    const connectionState = payload.data.connectionState
-    if (connectionState === "Connected") {
-        logger.log("Connected to AWS IoT");
-        // Publish user to IoT
-        publishUserToIoT(currentUsername).then(() => {
-            console.log('User published successfully');
-        }).catch((error) => {
-            console.error('Error publishing user:', error);
-        });
-    }
-    console.log(connectionState);
-  }
-});
+        if (connectionState === ConnectionState.Connected) {
+          // Connection established - clean up and resolve
+          clearTimeout(timeoutId);
+          resolve();
+        } else if (connectionState === ConnectionState.ConnectionLost) {
+          // Connection lost - clean up and reject
+          clearTimeout(timeoutId);
+          reject(new Error('Connection lost'));
+        }
+      }
+    });
+  });
+}
 
 async function initializePubSub() {
   try {
@@ -70,16 +80,8 @@ async function initializePubSub() {
      await subscribeToIoTTopic();
     console.log("subscription active");
 
-
-    pubsub.publish({
-      topics: 'trivia',
-      message:  {msg: 'Hello to all subscribers!'},
-      options: {provider: 'AWSIoTProvider'}
-    }).then( data => {
-        console.log('Message published:', data); // 🛠️
-    }).catch( error => {
-        console.error('Publish error:', error); // 🛠️
-    } );
+    await waitForConnection(10000); // Wait for connection
+    await publishUserToIoT("kiquetal-in-da-house");
 
     // 4. Publish presence
     //await publishUserToIoT("kiquetal");
