@@ -10,9 +10,23 @@ A real-time multiplayer trivia game built with AWS CDK and Amplify. Players can 
 ## Architecture
 
 - Frontend hosted on AWS S3/CloudFront via CDK
+  - Static assets served through CloudFront CDN
+  - S3 bucket configured as origin for CloudFront
+  - Secure access via CloudFront origin access identity
 - AWS IoT for real-time communication between players
 - Amplify for authentication and API integration
 - CDK for infrastructure as code
+
+## Infrastructure Details
+
+The CDK stack creates:
+1. An S3 bucket to store the built Trivia app (/trivia/dist)
+2. A CloudFront distribution with:
+   - S3 bucket as origin
+   - HTTPS-only access
+   - Default root object: index.html
+   - Proper cache behaviors for static assets
+3. Required IAM roles and policies
 
 ## Development
 
@@ -42,4 +56,3 @@ The CDK stack will automatically deploy the built frontend (/trivia/dist) to an 
 * `npx cdk diff`    compare deployed stack with current state
 * `npx cdk synth`   emits the synthesized CloudFormation template
 
-`
