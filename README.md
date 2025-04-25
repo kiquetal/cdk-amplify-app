@@ -40,6 +40,22 @@ The CDK stack creates:
 
 ## Development
 
+### Amplify Gen2 (ampx) Development
+```bash
+# Install ampx if not already installed
+npm add --save-dev @aws-amplify/backend@latest @aws-amplify/backend-cli@latest typescript
+
+# Start the sandbox environment
+npx ampx sandbox
+
+# Common ampx sandbox commands
+npx ampx sandbox init      # Initialize a new sandbox
+npx ampx sandbox start    # Start the sandbox environment
+npx ampx sandbox status   # Check sandbox status
+npx ampx sandbox stop     # Stop the sandbox
+npx ampx sandbox clean    # Clean up sandbox resources
+```
+
 ### Frontend (Trivia App)
 ```bash
 cd trivia
