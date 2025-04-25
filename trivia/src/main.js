@@ -5,7 +5,7 @@ import { fetchAuthSession } from 'aws-amplify/auth';
 import { ConsoleLogger } from 'aws-amplify/utils';
 import { CONNECTION_STATE_CHANGE, ConnectionState } from '@aws-amplify/pubsub';
 import { Hub } from 'aws-amplify/utils';
-
+import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 const logger = new ConsoleLogger('MyApp', 'DEBUG');
 
 

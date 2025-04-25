@@ -1,6 +1,16 @@
 # AWS IoT Trivia Challenge Game
 
-A real-time multiplayer trivia game built with AWS CDK and Amplify. Players can challenge each other to answer questions in real-time using AWS IoT for communication.
+### Backend
+- **AWS CDK** - Infrastructure as Code
+- **AWS Lambda** - Serverless compute
+- **AWS IoT Core** - IoT device management and messaging
+- **Amazon API Gateway** - RESTful API endpoints
+- **TypeScript** - Programming language for Lambda functions
+
+### Development Tools
+- **Node.js** - Runtime environment
+- **AWS SDK v3** - AWS service integration
+- **npm/yarn** - Package management
 
 ## Project Structure
 
