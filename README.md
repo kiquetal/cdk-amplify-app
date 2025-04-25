@@ -1,10 +1,39 @@
-# Welcome to your CDK TypeScript project
+# AWS IoT Trivia Challenge Game
 
-This is a blank project for CDK development with TypeScript.
+A real-time multiplayer trivia game built with AWS CDK and Amplify. Players can challenge each other to answer questions in real-time using AWS IoT for communication.
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+## Project Structure
 
-## Useful commands
+- `/trivia` - Frontend Amplify application
+- `/lib` - CDK infrastructure code
+
+## Architecture
+
+- Frontend hosted on AWS S3/CloudFront via CDK
+- AWS IoT for real-time communication between players
+- Amplify for authentication and API integration
+- CDK for infrastructure as code
+
+## Development
+
+### Frontend (Trivia App)
+```bash
+cd trivia
+npm install
+npm run dev    # Development server
+npm run build  # Build for production
+```
+
+### Infrastructure (CDK)
+```bash
+npm install
+npm run build
+npx cdk deploy
+```
+
+The CDK stack will automatically deploy the built frontend (/trivia/dist) to an S3 bucket and set up the required AWS IoT resources.
+
+## Useful Commands
 
 * `npm run build`   compile typescript to js
 * `npm run watch`   watch for changes and compile
@@ -12,3 +41,5 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 * `npx cdk deploy`  deploy this stack to your default AWS account/region
 * `npx cdk diff`    compare deployed stack with current state
 * `npx cdk synth`   emits the synthesized CloudFormation template
+
+`
