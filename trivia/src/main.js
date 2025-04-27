@@ -7,9 +7,6 @@ import { CONNECTION_STATE_CHANGE, ConnectionState } from '@aws-amplify/pubsub';
 import { Hub } from 'aws-amplify/utils';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 const logger = new ConsoleLogger('MyApp', 'DEBUG');
-
-
-
 import { PubSub } from "@aws-amplify/pubsub";
 import amplify_outputs from "../amplify_outputs.json";
 logger.debug("PubSub configured", Amplify.getConfig().PubSub);
@@ -334,19 +331,19 @@ window.challengeUser = async (username) => {
   }
 };
 
-// Initialize
-document.querySelector('#app').innerHTML = `
-  <div>
-    <div id="waiting-list">
-      <h2>Waiting List</h2>
-      <div id="waiting-list-content"></div>
+// UI: Replace direct innerHTML injection with a Vue mount.
+const App = {
+  template: `
+    <div>
+      <div id="waiting-list">
+        <h2>Waiting List</h2>
+        <div id="waiting-list-content"></div>
+      </div>                                            
     </div>
-  </div>
-`;
-
-window.challengeUser = (username) => {
-  alert(`Challenging ${username} to a game!`);
+  `
 };
+
+createApp(App).mount('#app');
 
 try {
     initializePubSub()
