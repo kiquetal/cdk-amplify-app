@@ -121,41 +121,20 @@ function subscribeToIoTTopic() {
     activeSubscription.subscribe({
       next:(data)=> {
         logger.log('Received message:', data);
+        const topic = data.topic;
+        logger.log('Topic:', topic); // 🛠️
+        const { type, username, msg } = data;
+        if (type === 'login') {
+          //no add the curren user
 
-        // Process different message types
-        if (data.value) {
-          // Check message type
-          if (data.value.type === 'logout') {
-            // Handle logout message
-            const username = data.value.username;
-            logger.log(`User ${username} has logged out`);
-            // Vue app reference will be available globally
-            if (window.vueApp) {
-              window.vueApp.removeUser(username);
-            } else {
-              logger.error('Vue app reference not available for logout handler');
+            if (username !== currentUsername) {
+                // Add user to the list
+                window.vueApp.addUser(username);
             }
-          } else if (data.value.msg) {
-            // Handle regular messages
-            const message = data.value.msg;
-            logger.log('Received regular message:', message);
 
-            if (message.startsWith('Ha ingresado ')) {
-              const username = message.replace('Ha ingresado ', '');
-              logger.log(`Detected new user login: ${username}, current user: ${currentUsername}`);
-
-              if (window.vueApp) {
-                if (username !== currentUsername) {
-                  logger.log(`Adding user ${username} to list`);
-                  window.vueApp.addUser(username);
-                } else {
-                  logger.log(`Ignoring current user (${username}) login message`);
-                }
-              } else {
-                logger.error('Vue app reference not available when processing login message');
-              }
-            }
-          }
+        } else if (type === 'logout') {
+          // Remove user from the list
+          window.vueApp.removeUser(username);
         }
       },
       error: (error) => {

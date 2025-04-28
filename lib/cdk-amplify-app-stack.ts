@@ -39,8 +39,8 @@ export class CdkAmplifyAppStack extends cdk.Stack {
 
     const attachIotPolicyLambda = new lambda.Function(this, 'AttachIotPolicy', {
       runtime: lambda.Runtime.NODEJS_LATEST,
-      handler: 'attachIotPolicy.handler',
-      code: lambda.Code.fromAsset(path.join(__dirname, '../src/lambdas'), {
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset(path.join(__dirname, '../src/lambdas/attachiotpolicy'), {
         bundling: {
            image: lambda.Runtime.NODEJS_LATEST.bundlingImage,
           environment: {
@@ -50,7 +50,12 @@ export class CdkAmplifyAppStack extends cdk.Stack {
           command: [
             'bash',
             '-c',
-            'npm install && npm run build && cp /asset-input/attachIotPolicy.js /asset-output',
+             [
+              'npm install',
+              'npm run build', // Assuming your build script compiles to a 'dist' folder
+              'cp dist/attachIotPolicy.js /asset-output/index.js', // Copy compiled JS and rename for handler
+            ].join(' && '),
+          
           ],
         },
       }),
