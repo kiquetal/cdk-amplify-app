@@ -73,6 +73,92 @@ npx cdk deploy
 
 The CDK stack will automatically deploy the built frontend (/trivia/dist) to an S3 bucket and set up the required AWS IoT resources.
 
+### Testing Lambda Functions Locally with AWS SAM
+
+AWS SAM (Serverless Application Model) allows you to test your Lambda functions locally before deploying to AWS.
+
+#### Prerequisites
+1. Install AWS SAM CLI:
+   ```bash
+   # For macOS
+   brew install aws-sam-cli
+
+   # For Windows (using Chocolatey)
+   choco install aws-sam-cli
+
+   # For Linux
+   pip install aws-sam-cli
+   ```
+
+2. Ensure Docker is installed and running (SAM uses Docker containers to emulate Lambda environment)
+
+#### Testing Lambda Functions Locally
+
+1. Generate a SAM template from your CDK code:
+   ```bash
+   npx cdk synth --no-staging > template.yaml
+   ```
+
+2. Identify the function you want to test from the template file
+
+3. Run the Lambda function locally:
+   ```bash
+   # Basic invocation
+   sam local invoke [FunctionLogicalId] -e events/event.json
+
+   # With environment variables
+   sam local invoke [FunctionLogicalId] -e events/event.json --env-vars env.json
+
+   # Example
+   sam local invoke TriviaGameFunction -e events/game-event.json
+   ```
+
+4. To test with API Gateway requests:
+   ```bash
+   # Start local API Gateway
+   sam local start-api
+
+   # Then access your endpoint at http://localhost:3000/your-endpoint
+   ```
+
+5. For debugging Lambda functions:
+   ```bash
+   # Add --debug-port flag to enable debugging
+   sam local invoke [FunctionLogicalId] -e events/event.json --debug-port 5858
+
+   # Then connect your IDE debugger to port 5858
+   ```
+
+#### Sample Event JSON Files
+
+Create a directory called `events` to store sample event JSON files:
+
+```bash
+mkdir -p events
+```
+
+Example event file for IoT topic message (`events/iot-event.json`):
+```json
+{
+  "message": "Hello from IoT",
+  "username": "player1",
+  "timestamp": "2023-06-15T12:00:00Z"
+}
+```
+
+#### Environment Variables File
+
+Create an `env.json` file to provide environment variables:
+```json
+{
+  "FunctionName": {
+    "ENVIRONMENT": "local",
+    "IOT_ENDPOINT": "your-iot-endpoint.iot.region.amazonaws.com",
+    "IOT_TOPIC": "trivia"
+  }
+}
+```
+
 ## Useful Commands
 
 * `npm run build`   compile typescript to js
@@ -82,3 +168,4 @@ The CDK stack will automatically deploy the built frontend (/trivia/dist) to an 
 * `npx cdk diff`    compare deployed stack with current state
 * `npx cdk synth`   emits the synthesized CloudFormation template
 
+`
