@@ -6,6 +6,7 @@ import { ConsoleLogger } from 'aws-amplify/utils';
 import { CONNECTION_STATE_CHANGE, ConnectionState } from '@aws-amplify/pubsub';
 import { Hub } from 'aws-amplify/utils';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
+import { createApp, ref } from 'vue'; // Import createApp and ref from Vue
 const logger = new ConsoleLogger('MyApp', 'DEBUG');
 import { PubSub } from "@aws-amplify/pubsub";
 import amplify_outputs from "../amplify_outputs.json";
@@ -75,11 +76,12 @@ async function initializePubSub() {
   }
 }
 
-async function addUserToWaitingList() {
+// Function modified to work with Vue app
+async function addUserToWaitingList(app) {
   try {
     console.log("Starting addUserToWaitingList");
 
-    console.log("Showing prompt for username");
+    // Using prompt temporarily, we'll improve this with a modal later
     const username = prompt("Please enter your username:");
     console.log("Username prompt result:", username);
 
@@ -90,38 +92,24 @@ async function addUserToWaitingList() {
 
     currentUsername = username;
 
+    // Update the Vue app's currentUser
+    app.currentUser = username;
+
     // 1. Publish user to IoT
     await publishUserToIoT(username);
-    // UI Setup
-    const waitingListContent = document.querySelector('#waiting-list-content');
-    waitingListContent.innerHTML = '';
 
-    // Mock users
-    ['Alice', 'Bob', 'Charlie', 'Diana'].forEach(user => {
-      if (user !== currentUsername) {
-        waitingListContent.innerHTML += `
-        <div class="user-entry">
-          <p>User: ${user}</p>
-          <button class="challenge-btn" onclick="window.challengeUser('${user}')">
-            Challenge
-          </button>
-        </div>`;
-      }
-    });
-
-    // Current user
-    waitingListContent.innerHTML += `
-    <div class="user-entry current-user">
-      <p>User: ${currentUsername} (You)</p>
-    </div>`;
-
-  }
-    catch (error) {
-        console.error('Error adding user to waiting list:', error);
+    // Add mock users to the Vue app's userList
+    if (app.userList.length === 0) {
+      ['Alice', 'Bob', 'Charlie', 'Diana'].forEach(user => {
+        if (user !== currentUsername) {
+          app.userList.push({ name: user });
+        }
+      });
     }
-
+  } catch (error) {
+    console.error('Error adding user to waiting list:', error);
+  }
 }
-
 
 function subscribeToIoTTopic() {
   return new Promise((resolve) => {
@@ -141,7 +129,10 @@ function subscribeToIoTTopic() {
             // Handle logout message
             const username = data.value.username;
             logger.log(`User ${username} has logged out`);
-            removeUserFromUI(username);
+            // Vue app reference will be available globally
+            if (window.vueApp) {
+              window.vueApp.removeUser(username);
+            }
           } else if (data.value.msg) {
             // Handle regular messages
             const message = data.value.msg;
@@ -149,8 +140,8 @@ function subscribeToIoTTopic() {
 
             if (message.startsWith('Ha ingresado ')) {
               const username = message.replace('Ha ingresado ', '');
-              if (username !== currentUsername) {
-                addUserToUI(username);
+              if (username !== currentUsername && window.vueApp) {
+                window.vueApp.addUser(username);
               }
             }
           }
@@ -168,35 +159,9 @@ function subscribeToIoTTopic() {
   });
 }
 
-
-// New: Dynamic UI updates from messages
-function addUserToUI(username) {
-  const existingUser = document.querySelector(`[data-username="${username}"]`);
-  if(existingUser) return;
-
-  const waitingListContent = document.querySelector('#waiting-list-content');
-  waitingListContent.innerHTML += `
-    <div class="user-entry" data-username="${username}">
-      <p>User: ${username}</p>
-      <button class="challenge-btn" onclick="window.challengeUser('${username}')">
-        Challenge
-      </button>
-    </div>`;
-}
-
-// New function to remove users from the UI when they logout
-function removeUserFromUI(username) {
-  const userElement = document.querySelector(`[data-username="${username}"]`);
-  if (userElement) {
-    userElement.remove();
-    logger.log(`Removed user ${username} from UI`);
-  }
-}
-
 // Updated publish function
 async function publishUserToIoT(username) {
   try {
-
     await pubsub.publish({
       topics: ['trivia'], // Use array format
       message: {
@@ -319,42 +284,107 @@ async function invokeLambda(functionName, payload) {
   }
 }
 
-// Example usage - update the challengeUser function
-window.challengeUser = async (username) => {
-  try {
-
-    alert("Challenging " + username + " to a game!");
-
-  } catch (error) {
-    console.error('Error challenging user:', error);
-    alert(`Error challenging ${username}: ${error.message}`);
-  }
-};
-
-// UI: Replace direct innerHTML injection with a Vue mount.
+// Define Vue App component
 const App = {
+  data() {
+    return {
+      userList: [],
+      currentUser: '',
+      newUsername: '', // For v-model binding in potential form
+      loading: false,
+      error: null
+    };
+  },
+  mounted() {
+    // Store a reference to the Vue app instance
+    window.vueApp = this;
+
+    // Initialize PubSub and add user to waiting list
+    this.loading = true;
+    initializePubSub()
+      .then(() => {
+        console.log("PubSub initialized successfully");
+        return addUserToWaitingList(this);
+      })
+      .catch((error) => {
+        console.error("Error initializing PubSub:", error);
+        this.error = error.message;
+      })
+      .finally(() => {
+        this.loading = false;
+      });
+  },
+  methods: {
+    challengeUser(username) {
+      try {
+        alert("Challenging " + username + " to a game!");
+      } catch (error) {
+        console.error('Error challenging user:', error);
+        alert(`Error challenging ${username}: ${error.message}`);
+      }
+    },
+    addUser(username) {
+      // Check if user already exists in the list
+      if (!this.userList.some(user => user.name === username)) {
+        this.userList.push({ name: username });
+      }
+    },
+    removeUser(username) {
+      this.userList = this.userList.filter(user => user.name !== username);
+    }
+  },
   template: `
     <div>
-      <div id="waiting-list">
+      <div v-if="loading">Loading...</div>
+      <div v-if="error" class="error">{{ error }}</div>
+      
+      <div v-if="!loading && !error" id="waiting-list">
         <h2>Waiting List</h2>
-        <div id="waiting-list-content"></div>
+        
+        <!-- Input for a potential username entry form -->
+        <div class="username-input" v-if="!currentUser">
+          <input v-model="newUsername" placeholder="Enter your username" />
+          <button @click="enterWaitingList">Enter</button>
+        </div>
+        
+        <div id="waiting-list-content">
+          <!-- Other users -->
+          <div v-for="user in userList" :key="user.name" class="user-entry">
+            <p>User: {{ user.name }}</p>
+            <button class="challenge-btn" @click="challengeUser(user.name)">
+              Challenge
+            </button>
+          </div>
+          
+          <!-- Current user -->
+          <div v-if="currentUser" class="user-entry current-user">
+            <p>User: {{ currentUser }} (You)</p>
+          </div>
+        </div>
       </div>                                            
     </div>
   `
 };
 
-createApp(App).mount('#app');
+// Create and mount Vue app
+const vueApp = createApp(App);
+
+// Check if the mounting element exists
+const mountElement = document.getElementById('app');
+if (!mountElement) {
+  // Create a mount element if it doesn't exist
+  console.warn("No #app element found in HTML. Creating one dynamically.");
+  const appDiv = document.createElement('div');
+  appDiv.id = 'app';
+  document.body.appendChild(appDiv);
+}
 
 try {
-    initializePubSub()
-        .then(() => {
-        console.log("PubSub initialized successfully");
-        addUserToWaitingList();
-        })
-        .catch((error) => {
-        console.error("Error initializing PubSub:", error);
-        });
+  vueApp.mount('#app');
+  console.log("Vue app mounted successfully");
+} catch (error) {
+  console.error("Failed to mount Vue app:", error);
 }
-catch (error) {
-    console.error("Error in main.js:", error);
-}
+
+// No need for the try-catch block here since we're initializing in the Vue component
+
