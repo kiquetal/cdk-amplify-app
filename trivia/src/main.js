@@ -132,6 +132,8 @@ function subscribeToIoTTopic() {
             // Vue app reference will be available globally
             if (window.vueApp) {
               window.vueApp.removeUser(username);
+            } else {
+              logger.error('Vue app reference not available for logout handler');
             }
           } else if (data.value.msg) {
             // Handle regular messages
@@ -140,8 +142,17 @@ function subscribeToIoTTopic() {
 
             if (message.startsWith('Ha ingresado ')) {
               const username = message.replace('Ha ingresado ', '');
-              if (username !== currentUsername && window.vueApp) {
-                window.vueApp.addUser(username);
+              logger.log(`Detected new user login: ${username}, current user: ${currentUsername}`);
+
+              if (window.vueApp) {
+                if (username !== currentUsername) {
+                  logger.log(`Adding user ${username} to list`);
+                  window.vueApp.addUser(username);
+                } else {
+                  logger.log(`Ignoring current user (${username}) login message`);
+                }
+              } else {
+                logger.error('Vue app reference not available when processing login message');
               }
             }
           }
@@ -331,7 +342,17 @@ const App = {
     },
     removeUser(username) {
       this.userList = this.userList.filter(user => user.name !== username);
-    }
+    },
+    enterWaitingList() {
+      if (this.newUsername) {
+        this.currentUser = this.newUsername;
+        this.addUser(this.newUsername);
+        this.publishUserToIoT(this.newUsername);
+        this.newUsername = ''; // Clear input after submission
+      } else {
+        alert("Please enter a username.");
+      }
+    },
   },
   template: `
     <div>
