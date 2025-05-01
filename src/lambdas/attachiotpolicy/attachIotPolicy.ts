@@ -4,17 +4,17 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 const iotClient = new IoTClient({});
 const IOT_POLICY_NAME = process.env.IOT_POLICY_NAME || 'DefaultIoTPolicy';
 
-export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    if (!event.body) {
+export const handler = async (event: any): Promise<APIGatewayProxyResult> => {
+    if (!event.identityId)
         return {
             statusCode: 400,
-            body: JSON.stringify({ message: 'Missing request body' })
+            body: JSON.stringify({ message: 'Missing identityId'})
         };
-    }
+    
 
     try {
-        const { identityId } = JSON.parse(event.body);
-
+        const { identityId } = event;
+	console.log("receivng value", identityId);
         if (!identityId) {
             return {
                 statusCode: 400,
