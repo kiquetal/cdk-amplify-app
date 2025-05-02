@@ -223,9 +223,11 @@ function setupConnectionMonitoring() {
   });
 }
 
-// Add function to invoke Lambda
+// Improved Lambda invocation function with better error handling and response parsing
 async function invokeLambda(functionName, payload) {
   try {
+    logger.log(`Preparing to invoke Lambda: ${functionName}`);
+
     // Get credentials from current session - reuse existing auth
     const { credentials } = await fetchAuthSession();
 
@@ -243,22 +245,30 @@ async function invokeLambda(functionName, payload) {
     const command = new InvokeCommand({
       FunctionName: functionName,
       Payload: JSON.stringify(payload),
-      InvocationType: 'RequestResponse' // For synchronous execution (use 'Event' for async)
+      InvocationType: 'RequestResponse' // For synchronous execution
     });
 
     // Send the command to Lambda
-    logger.log(`Invoking Lambda function: ${functionName}`);
+    logger.log(`Invoking Lambda function: ${functionName}`, payload);
     const response = await lambdaClient.send(command);
 
     // Handle the response
     if (response.StatusCode === 200) {
       // Convert the Uint8Array response to a string, then to JSON
       const responseData = new TextDecoder().decode(response.Payload);
-      logger.log('Lambda response:', responseData);
+      logger.log('Lambda responded with status 200, raw response:', responseData);
 
+      // Check for function errors that might be in the payload
+      if (response.FunctionError) {
+        logger.error('Lambda function error:', response.FunctionError, responseData);
+        throw new Error(`Lambda function error: ${responseData}`);
+      }
+
+      // Try to parse as JSON if possible
       try {
         return JSON.parse(responseData);
       } catch (e) {
+        logger.log('Response is not valid JSON, returning as text');
         return responseData;
       }
     } else {
@@ -278,7 +288,8 @@ const App = {
       currentUser: '',
       newUsername: '', // For v-model binding in potential form
       loading: false,
-      error: null
+      error: null,
+      lambdaResponse: null // Add to store Lambda responses
     };
   },
   mounted() {
@@ -303,10 +314,27 @@ const App = {
   methods: {
     challengeUser(username) {
       try {
-        alert("Challenging " + username + " to a game!");
+        this.loading = true;
+        // Example of using the Lambda function
+        invokeLambda('TriviaGameFunction', {
+          action: 'challenge',
+          challenger: this.currentUser,
+          challenged: username
+        })
+        .then(response => {
+          this.lambdaResponse = response;
+          alert(`Challenge sent to ${username}! Response: ${JSON.stringify(response)}`);
+        })
+        .catch(error => {
+          alert(`Error challenging ${username}: ${error.message}`);
+        })
+        .finally(() => {
+          this.loading = false;
+        });
       } catch (error) {
         console.error('Error challenging user:', error);
         alert(`Error challenging ${username}: ${error.message}`);
+        this.loading = false;
       }
     },
     addUser(username) {
@@ -327,6 +355,10 @@ const App = {
       <div v-if="!loading && !error" id="waiting-list">
         <h2>Waiting List</h2>
         
+        <div v-if="lambdaResponse" class="lambda-response">
+          <h3>Last Lambda Response:</h3>
+          <pre>{{ JSON.stringify(lambdaResponse, null, 2) }}</pre>
+        </div>
         
         <div id="waiting-list-content">
           <!-- Other users -->

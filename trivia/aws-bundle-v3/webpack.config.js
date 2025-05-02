@@ -6,7 +6,7 @@ module.exports = {
     // Specify the output file containing our bundled code.
     output: {
         path: path.resolve(__dirname, "../dist"),
-        filename: 'bundle.js'
+        filename: 'aws-bundle.js'
     },
     // Enable WebPack to use the 'path' package.
     resolve:{

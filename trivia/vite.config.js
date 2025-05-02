@@ -15,6 +15,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true
-  }
+    sourcemap: true,
+    // Ensure AWS SDK is properly bundled for browser use
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Group AWS SDK libraries into a single chunk
+          'aws-sdk': [
+            '@aws-sdk/client-lambda',
+          ]
+        }
+      }
+    }
+  },
+
 });
