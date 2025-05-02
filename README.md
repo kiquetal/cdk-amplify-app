@@ -68,6 +68,46 @@ async function handleChallengeClick() {
 - Amplify for authentication and API integration
 - CDK for infrastructure as code
 
+### Interaction Flow
+
+The following sequence diagram illustrates the communication flow between users, client devices, and AWS services:
+
+```mermaid
+sequenceDiagram
+    User1->>ClientDevice: Loads App
+    ClientDevice->>Amplify: Configures (Auth, PubSub)
+    Amplify->>AWS_IoT: Establishes MQTT Connection
+    Amplify->>Lambda: (Optional) Fetches Auth Credentials
+    User1->>ClientDevice: Enters Username
+    ClientDevice->>Amplify: Publishes "login" to trivia topic
+    AWS_IoT->>Lambda: (Optional) Processes Login (e.g., store in DB)
+
+   
+    User1->>ClientDevice: Challenges User2
+    ClientDevice->>Amplify: Invokes "AttachIotPolicy" Lambda
+    Lambda->>AWS_IoT: Attaches Policy (Optional)
+    ClientDevice->>Amplify: Publishes "gameStart" to trivia topic
+    AWS_IoT->>ClientDevice: Broadcasts "gameStart" message
+    User2->>ClientDevice: Receives Challenge
+    
+    User3->>ClientDevice: Selects a Game to Spectate
+    ClientDevice->>Amplify: Publishes "joinGame" to trivia topic
+    AWS_IoT->>ClientDevice: Broadcasts "joinGame" message
+
+    Lambda->>AWS_IoT: Publishes "question" to trivia topic
+    AWS_IoT->>ClientDevice: Broadcasts "question" to Player 1, Player 2, and User 3
+    User1->>ClientDevice: Receives Question
+    User2->>ClientDevice: Receives Question
+    User1->>ClientDevice: Submits Answer
+    ClientDevice->>Amplify: Publishes "answer" to trivia topic
+    AWS_IoT->>Lambda: Processes Answer
+    Lambda->>AWS_IoT: Publishes "gameState" (updated scores, etc.)
+    ClientDevice->>Amplify: Broadcasts "gameState" to Player 1, Player 2, and User 3
+
+    Lambda->>AWS_IoT: Publishes "gameEnd"
+    AWS_IoT->>ClientDevice: Broadcasts "gameEnd"
+```
+
 ## Infrastructure Details
 
 The CDK stack creates:
@@ -209,4 +249,3 @@ Create an `env.json` file to provide environment variables:
 * `npx cdk diff`    compare deployed stack with current state
 * `npx cdk synth`   emits the synthesized CloudFormation template
 
-`
