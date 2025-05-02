@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS SDK v3 Bundle Example</title>
+</head>
+<body>
+    <h1>AWS SDK v3 Bundle Example</h1>
+    <button id="invokeLambda">Invoke Lambda Function</button>
+    <pre id="result">Results will appear here...</pre>
+
+    <!-- Include the bundled AWS SDK -->
+    <script src="dist/aws-bundle.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize AWS clients with your region
+            const clients = AWS.createClients({
+                region: 'us-east-1',
+                // For credentials, you might use Cognito Identity or other auth methods
+                // credentials: { 
+                //   accessKeyId: 'YOUR_ACCESS_KEY', 
+                //   secretAccessKey: 'YOUR_SECRET_KEY' 
+                // }
+            });
+            
+            // Example of invoking a Lambda function
+            document.getElementById('invokeLambda').addEventListener('click', async function() {
+                const resultElement = document.getElementById('result');
+                resultElement.textContent = 'Calling Lambda...';
+                
+                try {
+                    // Create the Lambda invoke command
+                    const command = new AWS.Lambda.InvokeCommand({
+                        FunctionName: 'your-lambda-function-name',
+                        Payload: JSON.stringify({ 
+                            message: 'Hello from browser!' 
+                        })
+                    });
+                    
+                    // Send the command using the Lambda client
+                    const response = await clients.lambda.send(command);
+                    
+                    // Parse and display the response
+                    const responseData = JSON.parse(new TextDecoder().decode(response.Payload));
+                    resultElement.textContent = 'Response: ' + JSON.stringify(responseData, null, 2);
+                    
+                } catch (error) {
+                    resultElement.textContent = 'Error: ' + error.message;
+                    console.error('Lambda invocation error:', error);
+                }
+            });
+            
+            // Example of working with IoT client
+            async function getIoTEndpoint() {
+                try {
+                    const command = new AWS.IoT.DescribeEndpointCommand({});
+                    const response = await clients.iot.send(command);
+                    console.log("IoT Endpoint:", response.endpointAddress);
+                } catch (error) {
+                    console.error("Failed to get IoT endpoint:", error);
+                }
+            }
+            
+            // Uncomment to test IoT endpoint retrieval
+            // getIoTEndpoint();
+        });
+    </script>
+</body>
+</html>
