@@ -17,6 +17,7 @@ let pubsub = null;
 let currentUsername = '';
 let activeSubscription = null;
 let connectionMonitorActive = false;
+let identityIdCognito = null;
 
 // Replace the existing Hub.listen with our connection manager
 function waitForConnection(timeoutMs = 10000) {
@@ -54,6 +55,7 @@ async function initializePubSub() {
     const { credentials, identityId } = await fetchAuthSession();
 
     logger.log("Credentials:", identityId); // 🛠️
+    identityIdCognito = identityId;
     if (credentials) {
       pubsub = new PubSub({
         region: 'us-east-1',
@@ -240,11 +242,14 @@ async function invokeLambda(functionName, payload) {
       region: 'us-east-1', // Use same region as your other AWS services
       credentials: credentials
     });
-
+    const newPayload = {
+      ...payload,
+      identityId: identityIdCognito
+    };
     // Prepare the command with the function name and payload
     const command = new InvokeCommand({
       FunctionName: functionName,
-      Payload: JSON.stringify(payload),
+      Payload: JSON.stringify(newPayload),
       InvocationType: 'RequestResponse' // For synchronous execution
     });
 
@@ -316,8 +321,9 @@ const App = {
       try {
         this.loading = true;
         // Example of using the Lambda function
-        invokeLambda('TriviaGameFunction', {
+        invokeLambda('AttachIotPolicy', {
           action: 'challenge',
+          identityId: this.currentUser,
           challenger: this.currentUser,
           challenged: username
         })

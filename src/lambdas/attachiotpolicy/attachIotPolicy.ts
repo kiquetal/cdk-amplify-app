@@ -5,7 +5,7 @@ const iotClient = new IoTClient({});
 const IOT_POLICY_NAME = process.env.IOT_POLICY_NAME || 'DefaultIoTPolicy';
 
 export const handler = async (event: any): Promise<APIGatewayProxyResult> => {
-    if (!event.identityId)
+    if (!event)
         return {
             statusCode: 400,
             body: JSON.stringify({ message: 'Missing identityId'})
@@ -13,7 +13,7 @@ export const handler = async (event: any): Promise<APIGatewayProxyResult> => {
     
 
     try {
-        const { identityId } = event;
+        const { identityId } = JSON.parse(event);
 	console.log("receivng value", identityId);
         if (!identityId) {
             return {
