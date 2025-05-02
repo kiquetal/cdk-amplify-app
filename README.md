@@ -12,6 +12,47 @@
 - **AWS SDK v3** - AWS service integration
 - **npm/yarn** - Package management
 
+## Recent Updates
+
+### Lambda Integration for Challenge Button
+The trivia app now includes direct Lambda function integration when users click the challenge button:
+
+- **Remote Lambda Invocation** - Using AWS SDK v3 to invoke Lambda functions directly from the frontend
+- **Challenge Processing** - Backend Lambda processes user challenges and matchmaking
+- **Real-time Updates** - Challenge results are pushed back to users via IoT Core
+- **Optimized SDK Bundle** - Lightweight AWS SDK v3 bundle (/trivia/aws-bundle-v3) with only required clients
+
+Example usage:
+```javascript
+// Import the AWS bundle
+import AWS from './aws-bundle-v3';
+
+// Create configured clients
+const clients = AWS.createClients({
+  region: 'us-east-1',
+  credentials: /* credentials */
+});
+
+// Handle challenge button click
+async function handleChallengeClick() {
+  try {
+    const command = new AWS.Lambda.InvokeCommand({
+      FunctionName: 'trivia-challenge-function',
+      Payload: JSON.stringify({
+        action: 'createChallenge',
+        playerId: currentPlayer.id,
+        difficulty: selectedDifficulty
+      })
+    });
+    
+    const response = await clients.lambda.send(command);
+    // Process challenge response
+  } catch (error) {
+    console.error('Challenge request failed:', error);
+  }
+}
+```
+
 ## Project Structure
 
 - `/trivia` - Frontend Amplify application
